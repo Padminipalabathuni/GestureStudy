@@ -1,0 +1,197 @@
+window.currentQuizData.forEach((q, qIndex) => {
+                quizHTML += `
+                    <div style="margin: 30px 0;">
+                        <div class="quiz-question">${qIndex + 1}. ${q.question}</div>
+                        <div class="quiz-options">
+                            ${q.options.map((opt, oIndex) => `
+                                <div class="quiz-option" onclick="selectOption(${qIndex}, ${oIndex})">
+                                    ${String.fromCharCode(65 + oIndex)}. ${opt}
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+            });
+            document.getElementById('quizContent').innerHTML = quizHTML;
+        }
+
+        function selectOption(questionIndex, optionIndex) {
+            currentQuizAnswers[questionIndex] = optionIndex;
+            
+            const questionDiv = document.querySelectorAll('#quizContent > div')[questionIndex];
+            const options = questionDiv.querySelectorAll('.quiz-option');
+            
+            options.forEach((opt, idx) => {
+                opt.classList.remove('selected');
+                if (idx === optionIndex) {
+                    opt.classList.add('selected');
+                }
+            });
+        }
+
+        function submitQuiz() {
+            let score = 0;
+            window.currentQuizData.forEach((q, qIndex) => {
+                const questionDiv = document.querySelectorAll('#quizContent > div')[qIndex];
+                const options = questionDiv.querySelectorAll('.quiz-option');
+                
+                options.forEach((opt, oIndex) => {
+                    opt.style.pointerEvents = 'none';
+                    if (oIndex === q.correct) {
+                        opt.classList.add('correct');
+                    }
+                    if (currentQuizAnswers[qIndex] === oIndex && oIndex !== q.correct) {
+                        opt.classList.add('incorrect');
+                    }
+                });
+                
+                if (currentQuizAnswers[qIndex] === q.correct) {
+                    score++;
+                }
+            });
+            
+            const percentage = Math.round((score / window.currentQuizData.length) * 100);
+            const resultHTML = `
+                <div class="score-display">${percentage}%</div>
+                <p style="text-align: center; font-size: 1.2em;">
+                    You got ${score} out of ${window.currentQuizData.length} correct!
+                    ${percentage >= 80 ? '🎉 Great job!' : percentage >= 60 ? '👍 Good effort!' : '💪 Keep practicing!'}
+                </p>
+            `;
+            
+            document.getElementById('quizContent').insertAdjacentHTML('afterbegin', resultHTML);
+            document.getElementById('submitQuizBtn').style.display = 'none';
+        }
+
+        function showNinjaMode() {
+            if (!window.currentNinjaData) return;
+            
+            document.getElementById('resultsSection').classList.remove('show');
+            document.getElementById('ninjaSection').classList.remove('hidden');
+            
+            const ninja = window.currentNinjaData;
+            const ninjaHTML = `
+                <div class="memory-technique">
+                    <h4>🎯 Mnemonic Trick</h4>
+                    <p>${ninja.mnemonic}</p>
+                </div>
+                <div class="memory-technique">
+                    <h4>📖 Story Method</h4>
+                    <p>${ninja.story}</p>
+                </div>
+                <div class="memory-technique">
+                    <h4>🎨 Visual Association</h4>
+                    <p>${ninja.visual}</p>
+                </div>
+                <div class="memory-technique">
+                    <h4>🏰 Memory Palace</h4>
+                    <p>${ninja.memory_palace}</p>
+                </div>
+                <div class="memory-technique">
+                    <h4>⏰ Spaced Repetition Schedule</h4>
+                    <p>Review this material:</p>
+                    <ul style="margin-top: 10px;">
+                        <li>✅ In 1 hour</li>
+                        <li>✅ Tomorrow</li>
+                        <li>✅ In 3 days</li>
+                        <li>✅ In 1 week</li>
+                        <li>✅ In 1 month</li>
+                    </ul>
+                </div>
+            `;
+            
+            document.getElementById('ninjaContent').innerHTML = ninjaHTML;
+        }
+
+        function backToResults() {
+            document.getElementById('resultsSection').classList.add('show');
+            document.getElementById('quizSection').classList.add('hidden');
+            document.getElementById('ninjaSection').classList.add('hidden');
+        }
+
+        // Gesture Recognition
+        function toggleGestures() {
+            if (!gesturesEnabled) {
+                startGestureRecognition();
+            } else {
+                stopGestureRecognition();
+            }
+        }
+
+        function startGestureRecognition() {
+            const videoElement = document.getElementById('webcam');
+            
+            navigator.mediaDevices.getUserMedia({ video: true })
+                .then(stream => {
+                    videoElement.srcObject = stream;
+                    gesturesEnabled = true;
+                    document.getElementById('gestureStatus').textContent = '✅ Gestures Active';
+                    document.getElementById('gestureStatus').classList.add('active');
+                    document.getElementById('gestureToggle').textContent = 'Disable Gestures';
+                    
+                    // Simple gesture detection simulation
+                    detectGestures();
+                })
+                .catch(err => {
+                    alert('Camera access denied. Gestures will not work.');
+                    console.error(err);
+                });
+        }
+
+        function stopGestureRecognition() {
+            const videoElement = document.getElementById('webcam');
+            if (videoElement.srcObject) {
+                videoElement.srcObject.getTracks().forEach(track => track.stop());
+            }
+            gesturesEnabled = false;
+            document.getElementById('gestureStatus').textContent = 'Camera Off';
+            document.getElementById('gestureStatus').classList.remove('active');
+            document.getElementById('gestureToggle').textContent = 'Enable Gestures';
+        }
+
+        function detectGestures() {
+            // Simulated gesture detection for demo
+            // In production, this would use MediaPipe Hands
+            let gestureInterval = setInterval(() => {
+                if (!gesturesEnabled) {
+                    clearInterval(gestureInterval);
+                    return;
+                }
+                
+                // Random gesture detection for demo purposes
+                const gestures = ['👍 Thumbs Up', '👎 Thumbs Down', '✋ Open Palm', '👊 Fist', '✌️ Peace'];
+                const randomGesture = gestures[Math.floor(Math.random() * gestures.length)];
+                
+                // Update status occasionally
+                if (Math.random() > 0.95) {
+                    document.getElementById('gestureStatus').textContent = `Detected: ${randomGesture}`;
+                }
+            }, 500);
+        }
+
+        // Keyboard shortcuts for demo
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'n' || e.key === 'N') {
+                if (document.getElementById('resultsSection').classList.contains('show')) {
+                    showNinjaMode();
+                }
+            }
+            if (e.key === 'q' || e.key === 'Q') {
+                if (document.getElementById('resultsSection').classList.contains('show')) {
+                    showQuiz();
+                }
+            }
+            if (e.key === 'Escape') {
+                backToResults();
+            }
+        });
+
+        // Initialize - show topic mode by default for easy demo
+        window.addEventListener('load', () => {
+            console.log('GestureStudy loaded successfully!');
+            // Optionally auto-select topic mode
+            // selectMode('topic');
+        });
+    </script>
+</body>
+</html>
