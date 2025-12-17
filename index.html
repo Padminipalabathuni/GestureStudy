@@ -641,80 +641,112 @@
         }
 
         async function generateStudyMaterial() {
-            const topic = document.getElementById('topicInput').value.trim();
-            const subject = document.getElementById('subjectSelect').value;
-            
-            if (!topic) {
-                alert('Please enter a topic!');
-                return;
+    const topic = document.getElementById('topicInput').value.trim();
+    const subject = document.getElementById('subjectSelect').value;
+    
+    if (!topic) {
+        alert('Please enter a topic!');
+        return;
+    }
+    
+    const btn = document.getElementById('generateBtn');
+    btn.disabled = true;
+    btn.textContent = '🔄 Generating...';
+    
+    // Simulate API delay
+    await new Promise(resolve => setTimeout(resolve, 1500));
+    
+    // Generate demo content based on topic
+    currentStudyData = {
+        summary: `${topic} is a fascinating subject in ${subject}. This topic encompasses several key concepts that are fundamental to understanding the broader field. First, it's important to grasp the basic principles and foundational elements that make up this subject. Second, understanding how these elements interact and relate to each other provides deeper insight. Finally, recognizing the practical applications and real-world implications helps solidify your knowledge and demonstrates why this topic is significant in ${subject}.`,
+        
+        flashcards: [
+            {
+                question: `What is the main concept of ${topic}?`,
+                answer: `${topic} refers to the fundamental principles and processes involved in ${subject}, which form the basis for understanding more complex aspects of this field.`
+            },
+            {
+                question: `Why is ${topic} important in ${subject}?`,
+                answer: `It provides essential knowledge that helps us understand how systems work and interact, forming the foundation for advanced study and practical applications.`
+            },
+            {
+                question: `What are the key components of ${topic}?`,
+                answer: `The key components include the fundamental elements, their interactions, and the resulting processes that characterize this concept.`
+            },
+            {
+                question: `How does ${topic} relate to real-world applications?`,
+                answer: `${topic} has numerous practical applications in everyday life, technology, and scientific research, making it highly relevant to modern society.`
+            },
+            {
+                question: `What is a common misconception about ${topic}?`,
+                answer: `Many people oversimplify ${topic}, but it actually involves complex interactions and multiple factors working together.`
             }
-            
-            const btn = document.getElementById('generateBtn');
-            btn.disabled = true;
-            btn.textContent = '🔄 Generating...';
-            
-            try {
-                const response = await fetch('https://api.anthropic.com/v1/messages', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        model: 'claude-sonnet-4-20250514',
-                        max_tokens: 1000,
-                        messages: [{
-                            role: 'user',
-                            content: `Create comprehensive study material for "${topic}" in ${subject}. 
-                            
-Provide ONLY a valid JSON object (no markdown, no extra text) with exactly this structure:
-{
-  "summary": "detailed 3-paragraph explanation",
-  "flashcards": [
-    {"question": "question text", "answer": "answer text"},
-    {"question": "question text", "answer": "answer text"},
-    {"question": "question text", "answer": "answer text"},
-    {"question": "question text", "answer": "answer text"},
-    {"question": "question text", "answer": "answer text"}
-  ],
-  "quiz": [
-    {"question": "question text", "options": ["A", "B", "C", "D"], "correct": 0},
-    {"question": "question text", "options": ["A", "B", "C", "D"], "correct": 1},
-    {"question": "question text", "options": ["A", "B", "C", "D"], "correct": 2},
-    {"question": "question text", "options": ["A", "B", "C", "D"], "correct": 0},
-    {"question": "question text", "options": ["A", "B", "C", "D"], "correct": 3}
-  ],
-  "memory": {
-    "mnemonics": "memory tricks text",
-    "story": "story method text",
-    "visual": "visual techniques text",
-    "tips": "study tips text"
-  }
-}`
-                        }]
-                    })
-                });
-                
-                const data = await response.json();
-                let content = data.content[0].text;
-                
-                content = content.replace(/```json/g, '').replace(/```/g, '').trim();
-                
-                const jsonMatch = content.match(/\{[\s\S]*\}/);
-                if (jsonMatch) {
-                    currentStudyData = JSON.parse(jsonMatch[0]);
-                    displayStudyMaterial(currentStudyData);
-                } else {
-                    throw new Error('Could not parse response');
-                }
-                
-            } catch (error) {
-                console.error('Error:', error);
-                alert('Error generating material. Please try again.');
-            } finally {
-                btn.disabled = false;
-                btn.textContent = '🚀 Generate Study Material';
+        ],
+        
+        quiz: [
+            {
+                question: `What field does ${topic} primarily belong to?`,
+                options: [subject, "Mathematics", "Literature", "Art"],
+                correct: 0
+            },
+            {
+                question: `Which statement best describes ${topic}?`,
+                options: [
+                    "It has no practical applications",
+                    "It's a fundamental concept with wide-ranging applications",
+                    "It's only theoretical",
+                    "It's outdated"
+                ],
+                correct: 1
+            },
+            {
+                question: `What is essential for understanding ${topic}?`,
+                options: [
+                    "Only memorization",
+                    "Understanding foundational principles and their relationships",
+                    "Ignoring the details",
+                    "Avoiding practice"
+                ],
+                correct: 1
+            },
+            {
+                question: `How should you study ${topic} effectively?`,
+                options: [
+                    "Cram the night before",
+                    "Use multiple learning methods and practice regularly",
+                    "Read once and forget",
+                    "Avoid asking questions"
+                ],
+                correct: 1
+            },
+            {
+                question: `What makes ${topic} relevant today?`,
+                options: [
+                    "Historical significance only",
+                    "Current applications and ongoing research",
+                    "It's not relevant",
+                    "Entertainment value"
+                ],
+                correct: 1
             }
+        ],
+        
+        memory: {
+            mnemonics: `To remember ${topic}, try creating an acronym using the first letters of key concepts. For example, think of a memorable phrase where each word starts with an important term related to ${topic}.`,
+            
+            story: `Imagine ${topic} as a journey. You start at the foundation (basic concepts), travel through different landscapes (various aspects), and reach your destination (complete understanding). Each landmark along the way represents a key concept you need to remember.`,
+            
+            visual: `Create a mind map with ${topic} at the center. Draw branches for each major concept, using colors and simple drawings. Visual learners can benefit from creating diagrams, flowcharts, or even doodles that represent different aspects of ${topic}.`,
+            
+            tips: `Study ${topic} in 25-minute focused sessions with 5-minute breaks (Pomodoro Technique). Teach the concept to someone else - if you can explain it simply, you understand it well. Practice active recall by testing yourself regularly instead of just re-reading notes. Connect ${topic} to things you already know to create stronger memory associations.`
         }
+    };
+    
+    displayStudyMaterial(currentStudyData);
+    
+    btn.disabled = false;
+    btn.textContent = '🚀 Generate Study Material';
+}
 
         function displayStudyMaterial(data) {
             document.getElementById('summaryContent').innerHTML = `<p style="line-height: 1.8; font-size: 1.05em;">${data.summary}</p>`;
