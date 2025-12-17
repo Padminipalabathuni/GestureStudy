@@ -1,196 +1,853 @@
-window.currentQuizData.forEach((q, qIndex) => {
-                quizHTML += `
-                    <div style="margin: 30px 0;">
-                        <div class="quiz-question">${qIndex + 1}. ${q.question}</div>
-                        <div class="quiz-options">
-                            ${q.options.map((opt, oIndex) => `
-                                <div class="quiz-option" onclick="selectOption(${qIndex}, ${oIndex})">
-                                    ${String.fromCharCode(65 + oIndex)}. ${opt}
-                                </div>
-                            `).join('')}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GestureStudy - AI Study Assistant with Gestures</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/handpose"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            display: flex;
+            gap: 20px;
+        }
+
+        .main-content {
+            flex: 1;
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+
+        .gesture-panel {
+            width: 320px;
+            background: white;
+            border-radius: 20px;
+            padding: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            height: fit-content;
+            position: sticky;
+            top: 20px;
+        }
+
+        h1 {
+            color: #667eea;
+            margin-bottom: 10px;
+            font-size: 2.5em;
+        }
+
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 1.1em;
+        }
+
+        .mode-selector {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+
+        .mode-btn {
+            flex: 1;
+            padding: 15px;
+            border: 2px solid #667eea;
+            background: white;
+            color: #667eea;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 1em;
+            font-weight: bold;
+            transition: all 0.3s;
+        }
+
+        .mode-btn:hover {
+            background: #667eea;
+            color: white;
+            transform: translateY(-2px);
+        }
+
+        .mode-btn.active {
+            background: #667eea;
+            color: white;
+        }
+
+        .input-section {
+            margin-bottom: 20px;
+        }
+
+        input, select, textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 10px;
+            font-size: 1em;
+            margin-top: 8px;
+        }
+
+        textarea {
+            min-height: 100px;
+            resize: vertical;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px 30px;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 1.1em;
+            font-weight: bold;
+            margin-top: 10px;
+            transition: transform 0.2s;
+        }
+
+        .btn:hover {
+            transform: scale(1.05);
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .content-section {
+            margin-top: 30px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            display: none;
+        }
+
+        .content-section.active {
+            display: block;
+        }
+
+        .flashcard {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 10px 0;
+            cursor: pointer;
+            transition: transform 0.3s;
+            border: 2px solid #667eea;
+        }
+
+        .flashcard:hover {
+            transform: scale(1.02);
+        }
+
+        .flashcard.flipped {
+            background: #667eea;
+            color: white;
+        }
+
+        .quiz-question {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 15px 0;
+        }
+
+        .quiz-option {
+            padding: 12px;
+            margin: 8px 0;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .quiz-option:hover {
+            border-color: #667eea;
+            background: #f0f4ff;
+        }
+
+        .quiz-option.selected {
+            border-color: #667eea;
+            background: #667eea;
+            color: white;
+        }
+
+        .quiz-option.correct {
+            border-color: #28a745;
+            background: #28a745;
+            color: white;
+        }
+
+        .quiz-option.incorrect {
+            border-color: #dc3545;
+            background: #dc3545;
+            color: white;
+        }
+
+        .gesture-header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .gesture-header h2 {
+            color: #667eea;
+            font-size: 1.5em;
+            margin-bottom: 10px;
+        }
+
+        #videoCanvas {
+            width: 100%;
+            border-radius: 10px;
+            background: #000;
+            margin-bottom: 15px;
+        }
+
+        .gesture-status {
+            padding: 10px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            text-align: center;
+            font-weight: bold;
+        }
+
+        .gesture-status.active {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .gesture-status.inactive {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .gesture-guide {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 15px;
+        }
+
+        .gesture-guide h3 {
+            color: #667eea;
+            margin-bottom: 10px;
+            font-size: 1.1em;
+        }
+
+        .gesture-item {
+            display: flex;
+            align-items: center;
+            padding: 8px;
+            margin: 5px 0;
+            background: white;
+            border-radius: 5px;
+        }
+
+        .gesture-icon {
+            font-size: 1.5em;
+            margin-right: 10px;
+        }
+
+        .gesture-text {
+            flex: 1;
+        }
+
+        .gesture-name {
+            font-weight: bold;
+            color: #333;
+        }
+
+        .gesture-action {
+            font-size: 0.9em;
+            color: #666;
+        }
+
+        .current-gesture {
+            background: #667eea;
+            color: white;
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+            margin-bottom: 15px;
+            font-size: 1.2em;
+            font-weight: bold;
+        }
+
+        .score-display {
+            background: #667eea;
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            font-size: 1.5em;
+            margin-top: 20px;
+        }
+
+        @media (max-width: 968px) {
+            .container {
+                flex-direction: column;
+            }
+            .gesture-panel {
+                width: 100%;
+                position: relative;
+                top: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="main-content">
+            <h1>📚 GestureStudy</h1>
+            <p class="subtitle">AI-Powered Study Assistant with Gesture Control</p>
+
+            <div class="mode-selector">
+                <button class="mode-btn active" onclick="setMode('topic')">✍️ Enter Topic</button>
+                <button class="mode-btn" onclick="setMode('upload')">📄 Upload Document</button>
+                <button class="mode-btn" onclick="setMode('teacher')">👨‍🏫 Teacher Mode</button>
+            </div>
+
+            <div id="topicMode">
+                <div class="input-section">
+                    <label><strong>Study Topic:</strong></label>
+                    <input type="text" id="topicInput" placeholder="e.g., Photosynthesis, Pythagorean Theorem, World War II">
+                </div>
+                <div class="input-section">
+                    <label><strong>Subject:</strong></label>
+                    <select id="subjectSelect">
+                        <option value="biology">Biology</option>
+                        <option value="chemistry">Chemistry</option>
+                        <option value="physics">Physics</option>
+                        <option value="mathematics">Mathematics</option>
+                        <option value="history">History</option>
+                        <option value="geography">Geography</option>
+                        <option value="literature">Literature</option>
+                        <option value="computer-science">Computer Science</option>
+                        <option value="general">General Knowledge</option>
+                    </select>
+                </div>
+                <button class="btn" onclick="generateStudyMaterial()" id="generateBtn">🚀 Generate Study Material</button>
+            </div>
+
+            <div id="uploadMode" style="display:none;">
+                <div class="input-section">
+                    <label><strong>Upload Document:</strong></label>
+                    <input type="file" id="fileInput" accept=".pdf,.doc,.docx,.txt">
+                </div>
+                <button class="btn" onclick="processDocument()">📤 Process Document</button>
+            </div>
+
+            <div id="teacherMode" style="display:none;">
+                <div class="input-section">
+                    <label><strong>Lesson Topic:</strong></label>
+                    <input type="text" id="lessonInput" placeholder="What do you want to teach?">
+                </div>
+                <div class="input-section">
+                    <label><strong>Grade Level:</strong></label>
+                    <select id="gradeSelect">
+                        <option value="elementary">Elementary (K-5)</option>
+                        <option value="middle">Middle School (6-8)</option>
+                        <option value="high">High School (9-12)</option>
+                        <option value="college">College/University</option>
+                    </select>
+                </div>
+                <button class="btn" onclick="generateLessonPlan()">👨‍🏫 Generate Lesson Plan</button>
+            </div>
+
+            <div id="summarySection" class="content-section">
+                <h2>📝 Summary</h2>
+                <div id="summaryContent"></div>
+            </div>
+
+            <div id="flashcardsSection" class="content-section">
+                <h2>🎴 Flashcards</h2>
+                <p style="color: #666; margin-bottom: 15px;">Click on a card to flip it!</p>
+                <div id="flashcardsContent"></div>
+            </div>
+
+            <div id="quizSection" class="content-section">
+                <h2>🎯 Quiz</h2>
+                <div id="quizContent"></div>
+                <button class="btn" onclick="submitQuiz()" id="submitQuizBtn" style="display:none;">✅ Submit Quiz</button>
+                <div id="scoreDisplay"></div>
+            </div>
+
+            <div id="memorySection" class="content-section">
+                <h2>🥷 Ninja Memory Techniques</h2>
+                <div id="memoryContent"></div>
+            </div>
+        </div>
+
+        <div class="gesture-panel">
+            <div class="gesture-header">
+                <h2>👋 Gesture Control</h2>
+                <button class="btn" onclick="toggleGestures()" id="gestureToggleBtn">Enable Gestures</button>
+            </div>
+
+            <div class="gesture-status inactive" id="gestureStatus">
+                Gestures Disabled
+            </div>
+
+            <div id="currentGesture" class="current-gesture" style="display:none;">
+                No gesture detected
+            </div>
+
+            <canvas id="videoCanvas" width="280" height="210"></canvas>
+
+            <div class="gesture-guide">
+                <h3>📋 Gesture Guide:</h3>
+                <div class="gesture-item">
+                    <div class="gesture-icon">✋</div>
+                    <div class="gesture-text">
+                        <div class="gesture-name">Open Palm</div>
+                        <div class="gesture-action">Show Summary</div>
+                    </div>
+                </div>
+                <div class="gesture-item">
+                    <div class="gesture-icon">✌️</div>
+                    <div class="gesture-text">
+                        <div class="gesture-name">Peace Sign</div>
+                        <div class="gesture-action">Show Flashcards</div>
+                    </div>
+                </div>
+                <div class="gesture-item">
+                    <div class="gesture-icon">👊</div>
+                    <div class="gesture-text">
+                        <div class="gesture-name">Closed Fist</div>
+                        <div class="gesture-action">Show Quiz</div>
+                    </div>
+                </div>
+                <div class="gesture-item">
+                    <div class="gesture-icon">🤘</div>
+                    <div class="gesture-text">
+                        <div class="gesture-name">Rock Sign</div>
+                        <div class="gesture-action">Memory Techniques</div>
+                    </div>
+                </div>
+                <div class="gesture-item">
+                    <div class="gesture-icon">👍</div>
+                    <div class="gesture-text">
+                        <div class="gesture-name">Thumbs Up</div>
+                        <div class="gesture-action">Scroll Down</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let handposeModel = null;
+        let video = null;
+        let gesturesEnabled = false;
+        let lastGesture = null;
+        let lastGestureTime = 0;
+        let currentStudyData = null;
+        let quizAnswers = {};
+
+        async function initCamera() {
+            video = document.createElement('video');
+            video.width = 280;
+            video.height = 210;
+            
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { width: 280, height: 210 } 
+                });
+                video.srcObject = stream;
+                video.play();
+                return true;
+            } catch (error) {
+                console.error('Camera error:', error);
+                alert('Could not access camera. Please allow camera permissions.');
+                return false;
+            }
+        }
+
+        async function loadHandposeModel() {
+            try {
+                handposeModel = await handpose.load();
+                console.log('Handpose model loaded');
+                return true;
+            } catch (error) {
+                console.error('Model loading error:', error);
+                return false;
+            }
+        }
+
+        async function toggleGestures() {
+            const btn = document.getElementById('gestureToggleBtn');
+            const status = document.getElementById('gestureStatus');
+            const currentGestureDiv = document.getElementById('currentGesture');
+            
+            if (!gesturesEnabled) {
+                btn.disabled = true;
+                btn.textContent = 'Loading...';
+                
+                const cameraOk = await initCamera();
+                if (!cameraOk) {
+                    btn.disabled = false;
+                    btn.textContent = 'Enable Gestures';
+                    return;
+                }
+                
+                const modelOk = await loadHandposeModel();
+                if (!modelOk) {
+                    btn.disabled = false;
+                    btn.textContent = 'Enable Gestures';
+                    alert('Could not load gesture recognition model');
+                    return;
+                }
+                
+                gesturesEnabled = true;
+                btn.textContent = 'Disable Gestures';
+                status.textContent = 'Gestures Active ✓';
+                status.className = 'gesture-status active';
+                currentGestureDiv.style.display = 'block';
+                btn.disabled = false;
+                
+                detectGestures();
+            } else {
+                gesturesEnabled = false;
+                if (video && video.srcObject) {
+                    video.srcObject.getTracks().forEach(track => track.stop());
+                }
+                btn.textContent = 'Enable Gestures';
+                status.textContent = 'Gestures Disabled';
+                status.className = 'gesture-status inactive';
+                currentGestureDiv.style.display = 'none';
+                
+                const canvas = document.getElementById('videoCanvas');
+                const ctx = canvas.getContext('2d');
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+            }
+        }
+
+        async function detectGestures() {
+            if (!gesturesEnabled || !handposeModel || !video) return;
+            
+            const canvas = document.getElementById('videoCanvas');
+            const ctx = canvas.getContext('2d');
+            
+            const predictions = await handposeModel.estimateHands(video);
+            
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            
+            if (predictions.length > 0) {
+                const landmarks = predictions[0].landmarks;
+                
+                ctx.fillStyle = '#00ff00';
+                landmarks.forEach(point => {
+                    ctx.beginPath();
+                    ctx.arc(point[0], point[1], 3, 0, 2 * Math.PI);
+                    ctx.fill();
+                });
+                
+                const gesture = recognizeGesture(landmarks);
+                const currentTime = Date.now();
+                
+                if (gesture && gesture !== lastGesture && (currentTime - lastGestureTime) > 1500) {
+                    lastGesture = gesture;
+                    lastGestureTime = currentTime;
+                    handleGesture(gesture);
+                    document.getElementById('currentGesture').textContent = `Detected: ${gesture}`;
+                }
+            } else {
+                document.getElementById('currentGesture').textContent = 'No hand detected';
+            }
+            
+            requestAnimationFrame(detectGestures);
+        }
+
+        function recognizeGesture(landmarks) {
+            const fingerTips = [8, 12, 16, 20];
+            const fingerBases = [5, 9, 13, 17];
+            const thumb = { tip: 4, base: 2 };
+            
+            let extendedFingers = 0;
+            
+            for (let i = 0; i < fingerTips.length; i++) {
+                if (landmarks[fingerTips[i]][1] < landmarks[fingerBases[i]][1]) {
+                    extendedFingers++;
+                }
+            }
+            
+            const thumbExtended = landmarks[thumb.tip][0] < landmarks[thumb.base][0];
+            
+            if (extendedFingers === 0 && !thumbExtended) {
+                return '👊 Fist (Quiz)';
+            } else if (extendedFingers === 5 || extendedFingers === 4) {
+                return '✋ Palm (Summary)';
+            } else if (extendedFingers === 2 && landmarks[8][1] < landmarks[6][1] && landmarks[12][1] < landmarks[10][1]) {
+                return '✌️ Peace (Flashcards)';
+            } else if (extendedFingers === 2 && landmarks[12][1] < landmarks[10][1] && landmarks[20][1] < landmarks[18][1]) {
+                return '🤘 Rock (Memory)';
+            } else if (thumbExtended && extendedFingers === 0) {
+                return '👍 Thumbs (Scroll)';
+            }
+            
+            return null;
+        }
+
+        function handleGesture(gesture) {
+            if (gesture.includes('Summary')) {
+                showSection('summary');
+            } else if (gesture.includes('Flashcards')) {
+                showSection('flashcards');
+            } else if (gesture.includes('Quiz')) {
+                showSection('quiz');
+            } else if (gesture.includes('Memory')) {
+                showSection('memory');
+            } else if (gesture.includes('Scroll')) {
+                window.scrollBy({ top: 300, behavior: 'smooth' });
+            }
+        }
+
+        function showSection(section) {
+            document.querySelectorAll('.content-section').forEach(s => s.classList.remove('active'));
+            const sectionMap = {
+                'summary': 'summarySection',
+                'flashcards': 'flashcardsSection',
+                'quiz': 'quizSection',
+                'memory': 'memorySection'
+            };
+            const sectionId = sectionMap[section];
+            if (sectionId) {
+                const elem = document.getElementById(sectionId);
+                elem.classList.add('active');
+                elem.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        }
+
+        function setMode(mode) {
+            document.querySelectorAll('.mode-btn').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            document.getElementById('topicMode').style.display = mode === 'topic' ? 'block' : 'none';
+            document.getElementById('uploadMode').style.display = mode === 'upload' ? 'block' : 'none';
+            document.getElementById('teacherMode').style.display = mode === 'teacher' ? 'block' : 'none';
+        }
+
+        async function generateStudyMaterial() {
+            const topic = document.getElementById('topicInput').value.trim();
+            const subject = document.getElementById('subjectSelect').value;
+            
+            if (!topic) {
+                alert('Please enter a topic!');
+                return;
+            }
+            
+            const btn = document.getElementById('generateBtn');
+            btn.disabled = true;
+            btn.textContent = '🔄 Generating...';
+            
+            try {
+                const response = await fetch('https://api.anthropic.com/v1/messages', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        model: 'claude-sonnet-4-20250514',
+                        max_tokens: 1000,
+                        messages: [{
+                            role: 'user',
+                            content: `Create comprehensive study material for "${topic}" in ${subject}. 
+                            
+Provide ONLY a valid JSON object (no markdown, no extra text) with exactly this structure:
+{
+  "summary": "detailed 3-paragraph explanation",
+  "flashcards": [
+    {"question": "question text", "answer": "answer text"},
+    {"question": "question text", "answer": "answer text"},
+    {"question": "question text", "answer": "answer text"},
+    {"question": "question text", "answer": "answer text"},
+    {"question": "question text", "answer": "answer text"}
+  ],
+  "quiz": [
+    {"question": "question text", "options": ["A", "B", "C", "D"], "correct": 0},
+    {"question": "question text", "options": ["A", "B", "C", "D"], "correct": 1},
+    {"question": "question text", "options": ["A", "B", "C", "D"], "correct": 2},
+    {"question": "question text", "options": ["A", "B", "C", "D"], "correct": 0},
+    {"question": "question text", "options": ["A", "B", "C", "D"], "correct": 3}
+  ],
+  "memory": {
+    "mnemonics": "memory tricks text",
+    "story": "story method text",
+    "visual": "visual techniques text",
+    "tips": "study tips text"
+  }
+}`
+                        }]
+                    })
+                });
+                
+                const data = await response.json();
+                let content = data.content[0].text;
+                
+                content = content.replace(/```json/g, '').replace(/```/g, '').trim();
+                
+                const jsonMatch = content.match(/\{[\s\S]*\}/);
+                if (jsonMatch) {
+                    currentStudyData = JSON.parse(jsonMatch[0]);
+                    displayStudyMaterial(currentStudyData);
+                } else {
+                    throw new Error('Could not parse response');
+                }
+                
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Error generating material. Please try again.');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '🚀 Generate Study Material';
+            }
+        }
+
+        function displayStudyMaterial(data) {
+            document.getElementById('summaryContent').innerHTML = `<p style="line-height: 1.8; font-size: 1.05em;">${data.summary}</p>`;
+            document.getElementById('summarySection').classList.add('active');
+            
+            let flashcardsHTML = '';
+            data.flashcards.forEach((card, index) => {
+                flashcardsHTML += `
+                    <div class="flashcard" onclick="flipCard(${index})">
+                        <div id="card-${index}-front">
+                            <strong>Question:</strong><br>${card.question}
+                        </div>
+                        <div id="card-${index}-back" style="display:none;">
+                            <strong>Answer:</strong><br>${card.answer}
                         </div>
                     </div>
                 `;
             });
+            document.getElementById('flashcardsContent').innerHTML = flashcardsHTML;
+            document.getElementById('flashcardsSection').classList.add('active');
+            
+            let quizHTML = '';
+            data.quiz.forEach((q, qIndex) => {
+                quizHTML += `
+                    <div class="quiz-question">
+                        <p style="font-weight: bold; margin-bottom: 10px;">${qIndex + 1}. ${q.question}</p>
+                `;
+                q.options.forEach((opt, oIndex) => {
+                    quizHTML += `
+                        <div class="quiz-option" onclick="selectOption(${qIndex}, ${oIndex})">
+                            ${String.fromCharCode(65 + oIndex)}. ${opt}
+                        </div>
+                    `;
+                });
+                quizHTML += `</div>`;
+            });
             document.getElementById('quizContent').innerHTML = quizHTML;
+            document.getElementById('submitQuizBtn').style.display = 'block';
+            document.getElementById('quizSection').classList.add('active');
+            
+            document.getElementById('memoryContent').innerHTML = `
+                <div style="line-height: 1.8;">
+                    <h3 style="color: #667eea; margin-top: 15px;">🧠 Mnemonics:</h3>
+                    <p>${data.memory.mnemonics}</p>
+                    
+                    <h3 style="color: #667eea; margin-top: 15px;">📖 Story Method:</h3>
+                    <p>${data.memory.story}</p>
+                    
+                    <h3 style="color: #667eea; margin-top: 15px;">🎨 Visual Techniques:</h3>
+                    <p>${data.memory.visual}</p>
+                    
+                    <h3 style="color: #667eea; margin-top: 15px;">💡 Study Tips:</h3>
+                    <p>${data.memory.tips}</p>
+                </div>
+            `;
+            document.getElementById('memorySection').classList.add('active');
+        }
+
+        function flipCard(index) {
+            const front = document.getElementById(`card-${index}-front`);
+            const back = document.getElementById(`card-${index}-back`);
+            const card = front.parentElement;
+            
+            if (front.style.display !== 'none') {
+                front.style.display = 'none';
+                back.style.display = 'block';
+                card.classList.add('flipped');
+            } else {
+                front.style.display = 'block';
+                back.style.display = 'none';
+                card.classList.remove('flipped');
+            }
         }
 
         function selectOption(questionIndex, optionIndex) {
-            currentQuizAnswers[questionIndex] = optionIndex;
+            const question = document.querySelectorAll('.quiz-question')[questionIndex];
+            const options = question.querySelectorAll('.quiz-option');
             
-            const questionDiv = document.querySelectorAll('#quizContent > div')[questionIndex];
-            const options = questionDiv.querySelectorAll('.quiz-option');
+            options.forEach(opt => opt.classList.remove('selected'));
+            options[optionIndex].classList.add('selected');
             
-            options.forEach((opt, idx) => {
-                opt.classList.remove('selected');
-                if (idx === optionIndex) {
-                    opt.classList.add('selected');
-                }
-            });
+            quizAnswers[questionIndex] = optionIndex;
         }
 
         function submitQuiz() {
-            let score = 0;
-            window.currentQuizData.forEach((q, qIndex) => {
-                const questionDiv = document.querySelectorAll('#quizContent > div')[qIndex];
-                const options = questionDiv.querySelectorAll('.quiz-option');
+            if (!currentStudyData) return;
+            
+            let correct = 0;
+            const total = currentStudyData.quiz.length;
+            
+            currentStudyData.quiz.forEach((q, index) => {
+                const question = document.querySelectorAll('.quiz-question')[index];
+                const options = question.querySelectorAll('.quiz-option');
+                const userAnswer = quizAnswers[index];
                 
-                options.forEach((opt, oIndex) => {
-                    opt.style.pointerEvents = 'none';
-                    if (oIndex === q.correct) {
-                        opt.classList.add('correct');
-                    }
-                    if (currentQuizAnswers[qIndex] === oIndex && oIndex !== q.correct) {
-                        opt.classList.add('incorrect');
-                    }
-                });
-                
-                if (currentQuizAnswers[qIndex] === q.correct) {
-                    score++;
+                if (userAnswer !== undefined) {
+                    options.forEach((opt, i) => {
+                        opt.style.pointerEvents = 'none';
+                        if (i === q.correct) {
+                            opt.classList.add('correct');
+                        } else if (i === userAnswer && i !== q.correct) {
+                            opt.classList.add('incorrect');
+                        }
+                    });
+                    
+                    if (userAnswer === q.correct) correct++;
                 }
             });
             
-            const percentage = Math.round((score / window.currentQuizData.length) * 100);
-            const resultHTML = `
-                <div class="score-display">${percentage}%</div>
-                <p style="text-align: center; font-size: 1.2em;">
-                    You got ${score} out of ${window.currentQuizData.length} correct!
-                    ${percentage >= 80 ? '🎉 Great job!' : percentage >= 60 ? '👍 Good effort!' : '💪 Keep practicing!'}
-                </p>
+            const percentage = Math.round((correct / total) * 100);
+            document.getElementById('scoreDisplay').innerHTML = `
+                <div class="score-display">
+                    🎯 Your Score: ${correct}/${total} (${percentage}%)
+                    <br>
+                    <span style="font-size: 0.8em;">
+                        ${percentage >= 80 ? '🌟 Excellent!' : percentage >= 60 ? '👍 Good job!' : '💪 Keep practicing!'}
+                    </span>
+                </div>
             `;
             
-            document.getElementById('quizContent').insertAdjacentHTML('afterbegin', resultHTML);
             document.getElementById('submitQuizBtn').style.display = 'none';
         }
 
-        function showNinjaMode() {
-            if (!window.currentNinjaData) return;
-            
-            document.getElementById('resultsSection').classList.remove('show');
-            document.getElementById('ninjaSection').classList.remove('hidden');
-            
-            const ninja = window.currentNinjaData;
-            const ninjaHTML = `
-                <div class="memory-technique">
-                    <h4>🎯 Mnemonic Trick</h4>
-                    <p>${ninja.mnemonic}</p>
-                </div>
-                <div class="memory-technique">
-                    <h4>📖 Story Method</h4>
-                    <p>${ninja.story}</p>
-                </div>
-                <div class="memory-technique">
-                    <h4>🎨 Visual Association</h4>
-                    <p>${ninja.visual}</p>
-                </div>
-                <div class="memory-technique">
-                    <h4>🏰 Memory Palace</h4>
-                    <p>${ninja.memory_palace}</p>
-                </div>
-                <div class="memory-technique">
-                    <h4>⏰ Spaced Repetition Schedule</h4>
-                    <p>Review this material:</p>
-                    <ul style="margin-top: 10px;">
-                        <li>✅ In 1 hour</li>
-                        <li>✅ Tomorrow</li>
-                        <li>✅ In 3 days</li>
-                        <li>✅ In 1 week</li>
-                        <li>✅ In 1 month</li>
-                    </ul>
-                </div>
-            `;
-            
-            document.getElementById('ninjaContent').innerHTML = ninjaHTML;
+        function processDocument() {
+            alert('Document upload feature - demo only. Use "Enter Topic" mode for full functionality!');
         }
 
-        function backToResults() {
-            document.getElementById('resultsSection').classList.add('show');
-            document.getElementById('quizSection').classList.add('hidden');
-            document.getElementById('ninjaSection').classList.add('hidden');
+        function generateLessonPlan() {
+            alert('Teacher mode - demo only. Use "Enter Topic" mode for full functionality!');
         }
 
-        // Gesture Recognition
-        function toggleGestures() {
-            if (!gesturesEnabled) {
-                startGestureRecognition();
-            } else {
-                stopGestureRecognition();
-            }
-        }
-
-        function startGestureRecognition() {
-            const videoElement = document.getElementById('webcam');
-            
-            navigator.mediaDevices.getUserMedia({ video: true })
-                .then(stream => {
-                    videoElement.srcObject = stream;
-                    gesturesEnabled = true;
-                    document.getElementById('gestureStatus').textContent = '✅ Gestures Active';
-                    document.getElementById('gestureStatus').classList.add('active');
-                    document.getElementById('gestureToggle').textContent = 'Disable Gestures';
-                    
-                    // Simple gesture detection simulation
-                    detectGestures();
-                })
-                .catch(err => {
-                    alert('Camera access denied. Gestures will not work.');
-                    console.error(err);
-                });
-        }
-
-        function stopGestureRecognition() {
-            const videoElement = document.getElementById('webcam');
-            if (videoElement.srcObject) {
-                videoElement.srcObject.getTracks().forEach(track => track.stop());
-            }
-            gesturesEnabled = false;
-            document.getElementById('gestureStatus').textContent = 'Camera Off';
-            document.getElementById('gestureStatus').classList.remove('active');
-            document.getElementById('gestureToggle').textContent = 'Enable Gestures';
-        }
-
-        function detectGestures() {
-            // Simulated gesture detection for demo
-            // In production, this would use MediaPipe Hands
-            let gestureInterval = setInterval(() => {
-                if (!gesturesEnabled) {
-                    clearInterval(gestureInterval);
-                    return;
-                }
-                
-                // Random gesture detection for demo purposes
-                const gestures = ['👍 Thumbs Up', '👎 Thumbs Down', '✋ Open Palm', '👊 Fist', '✌️ Peace'];
-                const randomGesture = gestures[Math.floor(Math.random() * gestures.length)];
-                
-                // Update status occasionally
-                if (Math.random() > 0.95) {
-                    document.getElementById('gestureStatus').textContent = `Detected: ${randomGesture}`;
-                }
-            }, 500);
-        }
-
-        // Keyboard shortcuts for demo
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'n' || e.key === 'N') {
-                if (document.getElementById('resultsSection').classList.contains('show')) {
-                    showNinjaMode();
-                }
-            }
-            if (e.key === 'q' || e.key === 'Q') {
-                if (document.getElementById('resultsSection').classList.contains('show')) {
-                    showQuiz();
-                }
-            }
-            if (e.key === 'Escape') {
-                backToResults();
-            }
-        });
-
-        // Initialize - show topic mode by default for easy demo
         window.addEventListener('load', () => {
             console.log('GestureStudy loaded successfully!');
-            // Optionally auto-select topic mode
-            // selectMode('topic');
         });
     </script>
 </body>
